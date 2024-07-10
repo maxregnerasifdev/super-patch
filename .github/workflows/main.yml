@@ -1,4 +1,4 @@
-name: Upstream Changes
+name: Sync Repositories
 
 on:
   push:
@@ -6,8 +6,9 @@ on:
       - main  # Adjust branch name if needed
 
 jobs:
-  upstream:
+  sync_repositories:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout source repository
         uses: actions/checkout@v2
@@ -22,18 +23,30 @@ jobs:
           path: ./super-patch  # Directory to checkout into
           ref: main  # Adjust branch name if needed
 
-      - name: Create target directory
-        run: mkdir -p /github/workspace/super-patch/
+      - name: Set up Git
+        run: |
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions"
+
+      - name: Create new branch in source repository
+        run: |
+          cd $GITHUB_WORKSPACE/SuperPatcherGSI
+          git checkout -b sync-branch
 
       - name: Copy changes from source to target
         run: |
-          rsync -av --exclude=".git" ./ /github/workspace/super-patch/
+          rsync -av --exclude=".git" $GITHUB_WORKSPACE/SuperPatcherGSI/ $GITHUB_WORKSPACE/super-patch/
 
       - name: Commit and push changes to target repository
         run: |
-          cd /github/workspace/super-patch/
+          cd $GITHUB_WORKSPACE/super-patch
           git add .
-          git config --global user.email "actions@github.com"
-          git config --global user.name "GitHub Actions"
-          git commit -m "Upstream changes from maxregnerasifdev/SuperPatcherGSI"
+          git commit -m "Upstream changes from SuperPatcherGSI"
           git push origin main
+
+      - name: Commit and push changes to source repository
+        run: |
+          cd $GITHUB_WORKSPACE/SuperPatcherGSI
+          git add .
+          git commit -m "Upstream changes from super-patch"
+          git push origin sync-branch
