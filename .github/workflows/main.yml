@@ -1,4 +1,4 @@
-name: Sync Repositories
+name: Sync and Upload
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - main  # Adjust branch name if needed
 
 jobs:
-  sync_repositories:
+  sync_and_upload:
     runs-on: ubuntu-latest
 
     steps:
@@ -14,39 +14,54 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: maxregnerasifdev/SuperPatcherGSI
+          path: SuperPatcherGSI  # Directory to checkout into
           ref: main  # Adjust branch name if needed
 
-      - name: Checkout target repository
-        uses: actions/checkout@v2
-        with:
-          repository: maxregnerasifdev/super-patch
-          path: ./super-patch  # Directory to checkout into
-          ref: main  # Adjust branch name if needed
-
-      - name: Set up Git
+      - name: Set up Git credentials
         run: |
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Actions"
 
-      - name: Create new branch in source repository
+      - name: Clone super-patch repository
+        run: |
+          git clone --depth 1 --no-tags https://github.com/maxregnerasifdev/super-patch super-patch-full
+          mv super-patch-full/.git super-patch/
+          rm -rf super-patch-full
+        working-directory: $GITHUB_WORKSPACE
+
+      - name: Fetch all branches from super-patch
+        run: |
+          cd super-patch
+          git fetch --all
+
+      - name: Set upstream branches
+        run: |
+          cd $GITHUB_WORKSPACE/SuperPatcherGSI
+          git remote add super-patch $GITHUB_WORKSPACE/super-patch
+          git fetch super-patch
+
+          cd $GITHUB_WORKSPACE/super-patch
+          git remote add SuperPatcherGSI $GITHUB_WORKSPACE/SuperPatcherGSI
+          git fetch SuperPatcherGSI
+
+      - name: Upstream changes from SuperPatcherGSI to super-patch
         run: |
           cd $GITHUB_WORKSPACE/SuperPatcherGSI
           git checkout -b sync-branch
+          git merge --allow-unrelated-histories -m "Upstream changes from SuperPatcherGSI" super-patch/main
 
-      - name: Copy changes from source to target
-        run: |
-          rsync -av --exclude=".git" $GITHUB_WORKSPACE/SuperPatcherGSI/ $GITHUB_WORKSPACE/super-patch/
-
-      - name: Commit and push changes to target repository
+      - name: Upstream changes from super-patch to SuperPatcherGSI
         run: |
           cd $GITHUB_WORKSPACE/super-patch
-          git add .
-          git commit -m "Upstream changes from SuperPatcherGSI"
-          git push origin main
+          git checkout -b sync-branch
+          git merge --allow-unrelated-histories -m "Upstream changes from super-patch" SuperPatcherGSI/main
 
-      - name: Commit and push changes to source repository
+      - name: Archive result as zip
         run: |
-          cd $GITHUB_WORKSPACE/SuperPatcherGSI
-          git add .
-          git commit -m "Upstream changes from super-patch"
-          git push origin sync-branch
+          zip -r synced-repositories.zip SuperPatcherGSI super-patch
+
+      - name: Upload zip file
+        uses: actions/upload-artifact@v2
+        with:
+          name: synced-repositories
+          path: synced-repositories.zip
