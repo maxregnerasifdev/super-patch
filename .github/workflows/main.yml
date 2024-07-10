@@ -1,0 +1,36 @@
+name: Upstream Changes
+
+on:
+  push:
+    branches:
+      - main  # Adjust branch name if needed
+
+jobs:
+  upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source repository
+        uses: actions/checkout@v2
+        with:
+          repository: maxregnerasifdev/SuperPatcherGSI
+          ref: main  # Adjust branch name if needed
+
+      - name: Checkout target repository
+        uses: actions/checkout@v2
+        with:
+          repository: maxregnerasifdev/super-patch
+          path: ./super-patch  # Directory to checkout into
+          ref: main  # Adjust branch name if needed
+
+      - name: Copy changes from source to target
+        run: |
+          rsync -av --exclude=".git" ./ /github/workspace/super-patch/
+
+      - name: Commit and push changes to target repository
+        run: |
+          cd /github/workspace/super-patch/
+          git add .
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions"
+          git commit -m "Upstream changes from maxregnerasifdev/SuperPatcherGSI"
+          git push origin main
